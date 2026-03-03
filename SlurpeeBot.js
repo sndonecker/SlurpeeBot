@@ -1,28 +1,28 @@
-BotUrl = "https://discord.com/oauth2/authorize?client_id=1349197305802260500&permissions=8&integration_type=0&scope=bot";
-const TOKEN = '';
-
-const { Client, GatewayIntentBits, EmbedBuilder } = require('discord.js');
-const ytDlp = require('yt-dlp-exec');
-const fs = require('fs');
-const axios = require('axios');
+const { Client, GatewayIntentBits, Partials, EmbedBuilder } = require('discord.js');
+const config = require('./config.json');
 
 const client = new Client({
     intents: [
         GatewayIntentBits.Guilds,
         GatewayIntentBits.GuildMessages,
-        GatewayIntentBits.MessageContent,
-        GatewayIntentBits.GuildMembers
-    ]
+        GatewayIntentBits.DirectMessages,
+        GatewayIntentBits.MessageContent
+    ],
+    partials: [Partials.Channel]
+});
+
+const ytDlp = require('yt-dlp-exec');
+const fs = require('fs');
+const axios = require('axios');
+
+client.once('clientReady', () => {
+    console.log(`Logged in as ${client.user.tag}!`);
 });
 
 // === SETTINGS ===
 const DOWNLOAD_YOUTUBE = true;
 const MAX_FILE_SIZE = 8 * 1024 * 1024; // 8MB Discord Limit
 const DELETE_ORIGINAL_MESSAGE = false;
-
-client.once('ready', () => {
-    console.log(`Logged in as ${client.user.tag}!`);
-});
 
 async function isYouTubeEmbedBlocked(videoUrl) {
     try {
@@ -32,7 +32,7 @@ async function isYouTubeEmbedBlocked(videoUrl) {
         const videoId = videoIdMatch[1];
         const url = `https://www.youtube.com/embed/${videoId}`;
         const response = await axios.get(url, {
-            headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/110.0.0.0 Safari/537.36' }
+            headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/145.0.0.0 Safari/537.36' }
         });
 
         return response.data.includes("UNPLAYABLE") || response.data.includes("Video unavailable");
@@ -103,6 +103,7 @@ async function getBestTikTokFormat(videoUrl) {
         });
 
         if (!bestFormat) {
+            console.error('Bestformats error!', error);
             return null;
         }
 
@@ -110,12 +111,48 @@ async function getBestTikTokFormat(videoUrl) {
 
         return bestFormat.format_id;
     } catch (error) {
+        console.error('Error fetching TikTok formats:', error);
         return null;
     }
 }
 
+// Handle incoming messages
 client.on('messageCreate', async (message) => {
-    if (message.author.bot) return;
+    // Return if the message is from a bot
+    if (message.author.bot) {
+        return; // Ignore the message
+    }
+
+    // Check if the message is a partial
+    if (message.partial) {
+        try {
+            await message.fetch(); // Fetch the full message if it's a partial
+        } catch (error) {
+            console.error('Error fetching message:', error);
+            return; // Exit if there's an error fetching
+        }
+    }
+
+    console.log(`Received message: ${message.content}`);
+    console.log(`From user: ${message.author.username} (ID: ${message.author.id})`);
+    console.log(`Channel Type: ${message.channel.type}`); // This will log 1 for DM
+
+    // Check if the channel type is DM
+    if (message.channel.type === 1) {
+        const userId = message.author.id;
+
+        if (config.allowedUsers.includes(userId)) {
+            // Check if the message content is "ping" (case insensitive)
+            if (message.content.toLowerCase() === 'ping') {
+                await message.author.send('Pong!'); // Respond with Pong!
+            }
+        } else {
+            await message.author.send('go away'); // Respond to disallowed users
+        }
+        return; // No video functionality for DMs at this time!
+    } else {
+        console.log('Not a DM channel.');
+    }
 
     const ytRegex = /(https?:\/\/)?(www\.)?(youtube\.com|youtu\.be)\/\S+/gi;
     const ttRegex = /(https?:\/\/)?(www\.)?(tiktok\.com)\/\S+/gi;
@@ -145,7 +182,7 @@ client.on('messageCreate', async (message) => {
         const downloadingMessage = await message.channel.send(`🎥 Downloading video... Please wait!`);
 
         const outputFileName = `video-${Date.now()}.mp4`;
-        const outputPath = `./${outputFileName}`;
+        const outputPath = config.outputPath + outputFileName;
 
         if (isTikTok) {
             const tiktokFormat = await getBestTikTokFormat(videoUrl);
@@ -211,6 +248,26 @@ client.on('messageCreate', async (message) => {
     } catch (error) {
         message.channel.send(`❌ Failed to download the video.`);
     }
+
 });
 
-client.login(TOKEN);
+const shutdown = async () => {
+    console.log('Shutting down...');
+    await client.destroy(); // This logs off the bot
+    process.exit(0); // Exits the process
+}
+
+//Gracefully handle SIGINT
+process.on('SIGINT', async () => {
+    await shutdown();
+});
+
+//Gracefully handle SIGTERM
+process.on('SIGTERM', async () => {
+    await shutdown();
+})
+
+client.login(config.token)
+    .catch(err => console.error('Failed to login:', err));
+
+//thomp
