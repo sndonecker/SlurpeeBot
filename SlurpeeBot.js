@@ -20,6 +20,7 @@ const client = new Client({
 const MAX_FILE_SIZE = 8 * 1024 * 1024; // 8MB Discord upload limit
 const DOWNLOAD_YOUTUBE = true; // Toggle YouTube downloads on/off
 const SHORT_VIDEO_THRESHOLD = 30; // Duration in seconds (30 seconds) to consider a video "short"
+const DELETE_ORIGINAL_MESSAGE = true; //Should it replace the person's message
 
 // =====================
 // Utility to run shell commands (ffmpeg/ffprobe)
@@ -183,7 +184,7 @@ client.on('messageCreate', async message => {
         await downloadingMessage.delete().catch(() => {});
         fs.unlinkSync(finalPath);
 
-        if (isTikTok || (DELETE_ORIGINAL_MESSAGE && isYouTube)) {
+        if (DELETE_ORIGINAL_MESSAGE) {
             await message.delete().catch(console.error);
         }
 
