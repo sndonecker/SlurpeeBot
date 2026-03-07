@@ -11,7 +11,7 @@ Dependencies are listed in `package.json`, so just run:
 npm install
 
 ## Config (config.json)
-{
+```json
   "token": "YOUR_DISCORD_BOT_TOKEN",
   "outputPath": "./",
   "allowedUsers": [""],
@@ -21,7 +21,7 @@ npm install
   "SHORT_VIDEO_THRESHOLD": 30,
   "DELETE_ORIGINAL_MESSAGE": true,
   "LOG_CHAT": false
-}
+```
 
 ## Fields
 - token: Discord bot token  
