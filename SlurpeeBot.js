@@ -120,12 +120,14 @@ async function downloadYouTube(videoUrl, outputPath, manualRequest) {
 // TikTok download logic
 // =====================
 async function downloadTikTok(videoUrl, outputPath) {
-    const info = await getVideoInfo(videoUrl);
-    const fmt = info.formats.find(f => f.ext === 'mp4' && f.vcodec !== 'none');
-    if (!fmt) throw new Error('No valid TikTok MP4 format');
+    await ytDlp(videoUrl, {
+        format: "bv*[vcodec^=h264]+ba/b[vcodec^=h264]",
+        output: outputPath
+    });
 
-    await ytDlp(videoUrl, { format: fmt.format_id, output: outputPath });
-    if (!fs.existsSync(outputPath)) throw new Error('Failed to download TikTok');
+    if (!fs.existsSync(outputPath)) {
+        throw new Error("Failed to download TikTok");
+    }
 
     return outputPath;
 }
